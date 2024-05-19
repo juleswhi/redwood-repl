@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os/exec"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -103,6 +104,16 @@ func (m model) View() string {
 }
 
 func main() {
+
+	redwood_name := "redwood"
+
+	path, err := exec.LookPath(redwood_name)
+	if err != nil {
+		// log.Printf("%s is not installed on path\n", redwood_name)
+	} else {
+        log.Printf("%s is installed at %s\n", redwood_name, path)
+    }
+
 	m := New(NewPrompt("Redwood Interactive REPL"))
 	f, err := tea.LogToFile("debug.log", "debug")
 	if err != nil {
