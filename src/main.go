@@ -24,7 +24,7 @@ func SuccessStyles() *Styles {
 	s := new(Styles)
 	s.BorderColor = lipgloss.Color("36")
 	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder()).Width(60)
-	s.Output = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder()).Width(60)
+	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder()).Width(60)
 	s.Title = lipgloss.NewStyle().Bold(true)
 	return s
 }
@@ -33,7 +33,7 @@ func FailureStyles() *Styles {
 	s := new(Styles)
 	s.BorderColor = lipgloss.Color("9")
 	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder()).Width(60)
-	s.Output = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder()).Width(60)
+	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder()).Width(60)
 	s.Title = lipgloss.NewStyle().Bold(true)
 	return s
 }
@@ -95,10 +95,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = "Cleared Buffer"
 			m.successCommand = true
 			return m, nil
-		case "ctrl+n":
-			// Next Line
-		case "ctrl+p":
-			// Previous Line
 		case "enter":
 			current.answer = m.answerField.Value()
 			m.redwood.Add(m.answerField.Value(), m.redwood.buf1)
@@ -138,18 +134,30 @@ func (m model) View() string {
 	}
 
 	if len(m.output) == 0 {
-		return lipgloss.JoinVertical(
+		return lipgloss.Place(
+			m.width,
+			m.height,
 			lipgloss.Center,
-			styles.Title.Render(m.prompt.prompt),
-			styles.InputField.Render(m.answerField.View()),
+			lipgloss.Center,
+			lipgloss.JoinVertical(
+				lipgloss.Left,
+				styles.Title.Render(m.prompt.prompt),
+				styles.InputField.Render(m.answerField.View()),
+			),
 		)
 	}
 
-	return lipgloss.JoinVertical(
+	return lipgloss.Place(
+		m.width,
+		m.height,
 		lipgloss.Center,
-		styles.Title.Render(m.prompt.prompt),
-		styles.InputField.Render(m.answerField.View()),
-		styles.Output.Render(m.output),
+		lipgloss.Center,
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			styles.Title.Render(m.prompt.prompt),
+			styles.InputField.Render(m.answerField.View()),
+			styles.Output.Render(m.output),
+		),
 	)
 }
 
@@ -161,10 +169,7 @@ func main() {
 
 	if err != nil {
 		log.Fatal("Could not create file, e_buf_one.rw")
-	} else {
-		log.Info("Created file")
 	}
-
 	err = os.WriteFile(dir2, []byte{}, 0644)
 
 	if err != nil {
@@ -184,7 +189,17 @@ func main() {
 		rw.Clear(rw.buf2)
 		StartRepl(rw)
 	} else {
-		log.Warn("No binary provided. Looking on path.")
+		path := "/home/juleswhite/projects/redwood/zig-out/bin/redwood"
+
+		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+			log.Fatal("Could not find binary.")
+			return
+		}
+
+		rw := Redwood{bin: path, buf1: dir1, buf2: dir2}
+		rw.Clear(rw.buf1)
+		rw.Clear(rw.buf2)
+		StartRepl(rw)
 	}
 }
 
@@ -267,7 +282,7 @@ func StartRepl(rw Redwood) {
 	}
 
 	defer f.Close()
-	p := tea.NewProgram(m)
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
