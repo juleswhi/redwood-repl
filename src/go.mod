@@ -1,4 +1,4 @@
-module jam.computing/elf
+module github.com/jam-computing/oak
 
 go 1.22.1
 
@@ -10,6 +10,7 @@ require (
 
 require (
 	github.com/go-logfmt/logfmt v0.6.0 // indirect
+	github.com/sahilm/fuzzy v0.1.1-0.20230530133925-c48e322e2a8f // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 )
 

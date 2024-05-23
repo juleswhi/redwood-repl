@@ -95,6 +95,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = "Cleared Buffer"
 			m.successCommand = true
 			return m, nil
+        case "ctrl+r":
+            return m, nil
 		case "enter":
 			current.answer = m.answerField.Value()
 			m.redwood.Add(m.answerField.Value(), m.redwood.buf1)
@@ -185,8 +187,6 @@ func main() {
 		}
 
 		rw := Redwood{bin: bin_path, buf1: dir1, buf2: dir2}
-		rw.Clear(rw.buf1)
-		rw.Clear(rw.buf2)
 		StartRepl(rw)
 	} else {
 		path := "/home/juleswhite/projects/redwood/zig-out/bin/redwood"
@@ -287,3 +287,5 @@ func StartRepl(rw Redwood) {
 		log.Fatal(err)
 	}
 }
+
+
