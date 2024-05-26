@@ -38,7 +38,7 @@ func FailureStyles() *Styles {
 	return s
 }
 
-type model struct {
+type ReplModel struct {
 	redwood        Redwood
 	successCommand bool
 	prompt         Prompt
@@ -59,27 +59,30 @@ func NewPrompt(prompt string) Prompt {
 	return Prompt{prompt: prompt}
 }
 
-func New(prompt Prompt, redwood Redwood) *model {
+func NewReplModel(redwood *Redwood) *ReplModel {
+    if redwood == nil {
+        return nil
+    }
 	success := SuccessStyles()
 	failure := FailureStyles()
 	answerField := textinput.New()
-	answerField.Placeholder = "Function / Statement"
+	answerField.Placeholder = "Redwood Statement"
 	answerField.Focus()
-	return &model{
-		prompt:         prompt,
+	return &ReplModel{
+		prompt:         NewPrompt(""),
 		answerField:    answerField,
 		successStyles:  success,
 		failureStyles:  failure,
-		redwood:        redwood,
+		redwood:        *redwood,
 		successCommand: true,
 	}
 }
 
-func (m model) Init() tea.Cmd {
+func (m ReplModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m ReplModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	current := &m.prompt
 	switch msg := msg.(type) {
@@ -122,7 +125,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m model) View() string {
+func (m ReplModel) View() string {
 	if m.width == 0 {
 		return "Loading..."
 	}
@@ -149,8 +152,7 @@ func (m model) View() string {
 	)
 }
 
-func Init() {
-
+func Init() *Redwood {
 	dir1 := "/tmp/e_buf_one.rw"
 	dir2 := "/tmp/e_buf_two.rw"
 
@@ -173,21 +175,21 @@ func Init() {
 
 		if _, err := os.Stat(bin_path); errors.Is(err, os.ErrNotExist) {
 			log.Fatal("Could not find binary.")
-			return
+			return nil
 		}
 
 		rw := Redwood{bin: bin_path, buf1: dir1, buf2: dir2, led_config: config}
-		StartRepl(rw)
+        return &rw
 	} else {
 		path := "/home/juleswhite/projects/redwood/zig-out/bin/redwood"
 
 		if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 			log.Fatal("Could not find binary.")
-			return
+			return nil
 		}
 
 		rw := Redwood{bin: path, buf1: dir1, buf2: dir2, led_config: config}
-		StartRepl(rw)
+        return &rw
 	}
 }
 
@@ -263,17 +265,3 @@ func (r *Redwood) Clear(buf string) {
 	}
 }
 
-func StartRepl(rw Redwood) {
-	m := New(NewPrompt("Redwood Interactive REPL"), rw)
-	f, err := tea.LogToFile("debug.log", "debug")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer f.Close()
-	p := tea.NewProgram(m)
-	if _, err := p.Run(); err != nil {
-		log.Fatal(err)
-	}
-}
