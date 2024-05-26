@@ -80,7 +80,7 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-    m.loaded = false
+    m.loaded = true
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -91,6 +91,9 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+        case "ctrl+n":
+            m.focus = !m.focus
+            return m, nil
 		}
 	}
 	return m, nil
