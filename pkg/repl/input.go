@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/charmbracelet/log"
 
@@ -16,29 +17,28 @@ import (
 type Styles struct {
 	BorderColor lipgloss.Color
 	InputField  lipgloss.Style
-	Title       lipgloss.Style
 	Output      lipgloss.Style
 }
 
 func SuccessStyles() *Styles {
 	s := new(Styles)
 	s.BorderColor = lipgloss.Color("#3C3C3C")
-	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder())
-	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder())
-	s.Title = lipgloss.NewStyle().Bold(true)
+	s.InputField = lipgloss.NewStyle()
+	s.Output = lipgloss.NewStyle()
 	return s
 }
 
 func FailureStyles() *Styles {
 	s := new(Styles)
 	s.BorderColor = lipgloss.Color("9")
-	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder())
-	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder())
-	s.Title = lipgloss.NewStyle().Bold(true)
+	s.InputField = lipgloss.NewStyle()
+	s.Output = lipgloss.NewStyle()
 	return s
 }
 
 type ReplModel struct {
+	pickingConfig  bool
+	configFile     string
 	redwood        Redwood
 	successCommand bool
 	width          int
@@ -46,7 +46,12 @@ type ReplModel struct {
 	answerField    textinput.Model
 	successStyles  *Styles
 	failureStyles  *Styles
-	output         string
+	cmds           []*RedwoodCmd
+}
+
+type RedwoodCmd struct {
+	input  string
+	output string
 }
 
 func NewReplModel(redwood *Redwood) *ReplModel {
@@ -75,14 +80,15 @@ func (m ReplModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
+		m.width = (msg.Width / 2) - 2
+		m.height = msg.Height - 2
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "ctrl+l":
 			m.redwood.Clear(m.redwood.buf1)
+			m.cmds = nil
 			m.successCommand = true
 			return m, nil
 		case "ctrl+r":
@@ -91,7 +97,8 @@ func (m ReplModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.redwood.Add(m.answerField.Value(), m.redwood.buf1)
 			m.redwood.Add("\n", m.redwood.buf1)
 			out, success := m.redwood.Run()
-			m.output = out
+			c := RedwoodCmd{input: m.answerField.Value(), output: out}
+			m.cmds = append(m.cmds, &c)
 			if success {
 				m.redwood.Clear(m.redwood.buf2)
 				contents := m.redwood.Read(m.redwood.buf1)
@@ -120,14 +127,24 @@ func (m ReplModel) View() string {
 		styles = *m.failureStyles
 	}
 
-	if len(m.output) == 0 {
-		return styles.InputField.Render(m.answerField.View())
+	outputs := make([]string, len(m.cmds))
+
+	for i, cmd := range m.cmds {
+		combined := "> " + cmd.input + "\n" + cmd.output
+		outputs[i] = combined
 	}
 
-	return lipgloss.JoinVertical(
-		lipgloss.Center,
-		styles.InputField.Width(m.width).Render(m.answerField.View()),
-		styles.Output.Render(m.output),
+	out := strings.Join(outputs, "")
+
+    if len(outputs) == 0 {
+        out = "Redwood REPL"
+        styles.Output = styles.Output.Bold(true)
+    }
+
+	return lipgloss.JoinVertical (
+		lipgloss.Left,
+		styles.Output.Render(out),
+        styles.InputField.Width(m.width).Render(m.answerField.View()),
 	)
 }
 
