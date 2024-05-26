@@ -23,7 +23,7 @@ type Styles struct {
 func SuccessStyles() *Styles {
 	s := new(Styles)
 	s.BorderColor = lipgloss.Color("36")
-	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder()).Width(60)
+	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.HiddenBorder()).Width(60)
 	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder()).Width(60)
 	s.Title = lipgloss.NewStyle().Bold(true)
 	return s
@@ -32,7 +32,7 @@ func SuccessStyles() *Styles {
 func FailureStyles() *Styles {
 	s := new(Styles)
 	s.BorderColor = lipgloss.Color("9")
-	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder()).Width(60)
+	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.HiddenBorder()).Width(60)
 	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder()).Width(60)
 	s.Title = lipgloss.NewStyle().Bold(true)
 	return s
@@ -95,8 +95,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.output = "Cleared Buffer"
 			m.successCommand = true
 			return m, nil
-        case "ctrl+r":
-            return m, nil
+		case "ctrl+r":
+			return m, nil
 		case "enter":
 			current.answer = m.answerField.Value()
 			m.redwood.Add(m.answerField.Value(), m.redwood.buf1)
@@ -136,30 +136,16 @@ func (m model) View() string {
 	}
 
 	if len(m.output) == 0 {
-		return lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			lipgloss.JoinVertical(
-				lipgloss.Left,
-				styles.Title.Render(m.prompt.prompt),
-				styles.InputField.Render(m.answerField.View()),
-			),
+		return lipgloss.JoinVertical(
+			lipgloss.Left,
+			styles.InputField.Render(m.answerField.View()),
 		)
 	}
 
-	return lipgloss.Place(
-		m.width,
-		m.height,
-		lipgloss.Center,
-		lipgloss.Center,
-		lipgloss.JoinVertical(
-			lipgloss.Left,
-			styles.Title.Render(m.prompt.prompt),
-			styles.InputField.Render(m.answerField.View()),
-			styles.Output.Render(m.output),
-		),
+	return lipgloss.JoinVertical(
+		lipgloss.Left,
+		styles.InputField.Render(m.answerField.View()),
+		styles.Output.Render(m.output),
 	)
 }
 
@@ -167,11 +153,14 @@ func main() {
 	dir1 := "/tmp/e_buf_one.rw"
 	dir2 := "/tmp/e_buf_two.rw"
 
+	config := "led.json"
+
 	err := os.WriteFile(dir1, []byte{}, 0644)
 
 	if err != nil {
 		log.Fatal("Could not create file, e_buf_one.rw")
 	}
+
 	err = os.WriteFile(dir2, []byte{}, 0644)
 
 	if err != nil {
@@ -186,7 +175,7 @@ func main() {
 			return
 		}
 
-		rw := Redwood{bin: bin_path, buf1: dir1, buf2: dir2}
+		rw := Redwood{bin: bin_path, buf1: dir1, buf2: dir2, led_config: config}
 		StartRepl(rw)
 	} else {
 		path := "/home/juleswhite/projects/redwood/zig-out/bin/redwood"
@@ -196,21 +185,20 @@ func main() {
 			return
 		}
 
-		rw := Redwood{bin: path, buf1: dir1, buf2: dir2}
-		rw.Clear(rw.buf1)
-		rw.Clear(rw.buf2)
+		rw := Redwood{bin: path, buf1: dir1, buf2: dir2, led_config: config}
 		StartRepl(rw)
 	}
 }
 
 type Redwood struct {
-	bin  string
-	buf1 string
-	buf2 string
+	bin        string
+	buf1       string
+	buf2       string
+	led_config string
 }
 
 func (r *Redwood) Run() (string, bool) {
-	cmd := exec.Command(r.bin, r.buf1)
+	cmd := exec.Command(r.bin, r.buf1, r.led_config)
 
 	out, err := cmd.CombinedOutput()
 
@@ -282,10 +270,8 @@ func StartRepl(rw Redwood) {
 	}
 
 	defer f.Close()
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		log.Fatal(err)
 	}
 }
-
-
