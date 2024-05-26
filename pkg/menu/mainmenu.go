@@ -59,7 +59,6 @@ func (m MenuModel) Init() tea.Cmd {
 }
 
 func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-
 	if m.focus || !m.loaded {
 		mlist, cmd := m.list.Update(msg)
 
@@ -80,20 +79,22 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-    m.loaded = true
+	m.loaded = true
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.list.Update(msg)
+		m.repl.Update(msg)
 		return m, nil
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
-        case "ctrl+n":
-            m.focus = !m.focus
-            return m, nil
+		case "ctrl+n":
+			m.focus = !m.focus
+			return m, nil
 		}
 	}
 	return m, nil
@@ -104,22 +105,16 @@ func (m MenuModel) View() string {
 	var repl string
 
 	if m.focus {
-		list = m.focusStyle.Height(m.height - 2).Render(m.list.View())
-		repl = m.unfocusStyle.Height(m.height - 2).Render(m.repl.View())
+		list = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.list.View())
+		repl = m.unfocusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.repl.View())
 	} else {
-		list = m.unfocusStyle.Height(m.height - 2).Render(m.list.View())
-		repl = m.focusStyle.Height(m.height - 2).Render(m.repl.View())
+		list = m.unfocusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.list.View())
+		repl = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.repl.View())
 	}
 
-	return lipgloss.Place(
-		m.width,
-		m.height,
-		lipgloss.Center,
-		lipgloss.Center,
-		lipgloss.JoinHorizontal(
-			lipgloss.Center,
-			list,
-			repl,
-		),
+	return lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		list,
+        repl,
 	)
 }

@@ -67,13 +67,10 @@ func (m ListModel) Init() tea.Cmd {
 
 func (m ListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
-			return m, tea.Quit
-		}
 	case tea.WindowSizeMsg:
 		_, v := docStyle.GetFrameSize()
 		m.List.SetSize(msg.Width, msg.Height-(v*2))
+        return m, nil
 	}
 
 	var cmd tea.Cmd

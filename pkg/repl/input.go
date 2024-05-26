@@ -23,8 +23,8 @@ type Styles struct {
 func SuccessStyles() *Styles {
 	s := new(Styles)
 	s.BorderColor = lipgloss.Color("#3C3C3C")
-    s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.DoubleBorder()).Width(40)
-	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder()).Width(60)
+	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder())
+	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder())
 	s.Title = lipgloss.NewStyle().Bold(true)
 	return s
 }
@@ -32,8 +32,8 @@ func SuccessStyles() *Styles {
 func FailureStyles() *Styles {
 	s := new(Styles)
 	s.BorderColor = lipgloss.Color("9")
-	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder()).Width(60)
-	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder()).Width(60)
+	s.InputField = lipgloss.NewStyle().BorderForeground(s.BorderColor).BorderStyle(lipgloss.RoundedBorder())
+	s.Output = lipgloss.NewStyle().BorderForeground(lipgloss.Color("#3C3C3C")).BorderStyle(lipgloss.DoubleBorder())
 	s.Title = lipgloss.NewStyle().Bold(true)
 	return s
 }
@@ -41,7 +41,6 @@ func FailureStyles() *Styles {
 type ReplModel struct {
 	redwood        Redwood
 	successCommand bool
-	prompt         Prompt
 	width          int
 	height         int
 	answerField    textinput.Model
@@ -50,26 +49,16 @@ type ReplModel struct {
 	output         string
 }
 
-type Prompt struct {
-	prompt string
-	answer string
-}
-
-func NewPrompt(prompt string) Prompt {
-	return Prompt{prompt: prompt}
-}
-
 func NewReplModel(redwood *Redwood) *ReplModel {
-    if redwood == nil {
-        return nil
-    }
+	if redwood == nil {
+		return nil
+	}
 	success := SuccessStyles()
 	failure := FailureStyles()
 	answerField := textinput.New()
 	answerField.Placeholder = "Redwood Statement"
 	answerField.Focus()
 	return &ReplModel{
-		prompt:         NewPrompt(""),
 		answerField:    answerField,
 		successStyles:  success,
 		failureStyles:  failure,
@@ -84,7 +73,6 @@ func (m ReplModel) Init() tea.Cmd {
 
 func (m ReplModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	current := &m.prompt
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -95,13 +83,11 @@ func (m ReplModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "ctrl+l":
 			m.redwood.Clear(m.redwood.buf1)
-			m.output = "Cleared Buffer"
 			m.successCommand = true
 			return m, nil
 		case "ctrl+r":
 			return m, nil
 		case "enter":
-			current.answer = m.answerField.Value()
 			m.redwood.Add(m.answerField.Value(), m.redwood.buf1)
 			m.redwood.Add("\n", m.redwood.buf1)
 			out, success := m.redwood.Run()
@@ -126,10 +112,6 @@ func (m ReplModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m ReplModel) View() string {
-	if m.width == 0 {
-		return "Loading..."
-	}
-
 	var styles Styles
 
 	if m.successCommand {
@@ -139,15 +121,12 @@ func (m ReplModel) View() string {
 	}
 
 	if len(m.output) == 0 {
-		return lipgloss.JoinVertical(
-			lipgloss.Left,
-			styles.InputField.Render(m.answerField.View()),
-		)
+		return styles.InputField.Render(m.answerField.View())
 	}
 
 	return lipgloss.JoinVertical(
-		lipgloss.Left,
-		styles.InputField.Render(m.answerField.View()),
+		lipgloss.Center,
+		styles.InputField.Width(m.width).Render(m.answerField.View()),
 		styles.Output.Render(m.output),
 	)
 }
@@ -179,7 +158,7 @@ func Init() *Redwood {
 		}
 
 		rw := Redwood{bin: bin_path, buf1: dir1, buf2: dir2, led_config: config}
-        return &rw
+		return &rw
 	} else {
 		path := "/home/juleswhite/projects/redwood/zig-out/bin/redwood"
 
@@ -189,10 +168,9 @@ func Init() *Redwood {
 		}
 
 		rw := Redwood{bin: path, buf1: dir1, buf2: dir2, led_config: config}
-        return &rw
+		return &rw
 	}
 }
-
 
 type Redwood struct {
 	bin        string
@@ -264,4 +242,3 @@ func (r *Redwood) Clear(buf string) {
 		log.Fatal("Could not access temp dir for repl buffer.")
 	}
 }
-
