@@ -14,26 +14,42 @@ type MenuModel struct {
 	width  int
 	height int
 
-	list   components.ListModel
-	repl   repl.ReplModel
-	picker filepicker.Model
-	help   HelpModel
+	list   *components.ListModel
+	repl   *repl.ReplModel
+	picker *filepicker.Model
 
 	focus         bool
 	loaded        bool
 	pickingConfig bool
 
+	popup         string
+	popupselected bool
+	popupyes      lipgloss.Style
+	popupno       lipgloss.Style
+	popping       bool
+	popupStyle    lipgloss.Style
+
 	focusStyle   lipgloss.Style
 	unfocusStyle lipgloss.Style
+}
+
+func GetFilesFromServer() {
+
 }
 
 func CreateMenu() MenuModel {
 	focus, unfocus := CreateStyles()
 	r := repl.NewReplModel(repl.Init())
 
-    fp := filepicker.New()
-    fp.ShowHidden = true
-    fp.CurrentDirectory, _ = os.Getwd()
+	fp := filepicker.New()
+	fp.AllowedTypes = []string{".json"}
+	fp.CurrentDirectory, _ = os.Getwd()
+
+	pstyle := lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Bold(true)
+	focusColor := lipgloss.Color("36")
+	unfocusColor := lipgloss.Color("9")
+	pyes := lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Bold(true).Width(10).BorderForeground(focusColor).Align(lipgloss.Center)
+	pno := lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Bold(true).Width(10).BorderForeground(unfocusColor).Align(lipgloss.Center)
 
 	if r == nil {
 		panic("Totes could not create menu")
@@ -42,15 +58,20 @@ func CreateMenu() MenuModel {
 	return MenuModel{
 		width:         0,
 		height:        0,
-		list:          *components.NewListModel(),
-		repl:          *r,
-		picker:        fp,
-		help:          NewHelp(),
+		list:          components.NewListModel(),
+		repl:          r,
+		picker:        &fp,
 		focusStyle:    focus,
 		unfocusStyle:  unfocus,
 		focus:         true,
 		loaded:        false,
 		pickingConfig: true,
+		popping:       true,
+		popup:         "Would you like to contact the server?",
+		popupStyle:    pstyle,
+		popupyes:      pyes,
+		popupno:       pno,
+        popupselected: true,
 	}
 }
 
@@ -70,28 +91,62 @@ func (m MenuModel) Init() tea.Cmd {
 }
 
 func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-    var cmd tea.Cmd
+	var cmd tea.Cmd
 
-	if !m.focus || !m.loaded {
+	if m.popping {
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case "y":
+                m.popupselected = true
+                m.popping = false
+                GetFilesFromServer()
+                return m, nil
+            case "n":
+                m.popupselected = false
+                m.popping = false
+                GetFilesFromServer()
+                return m, nil
+            case "h":
+                m.popupselected = !m.popupselected
+            case "l":
+                m.popupselected = !m.popupselected
+            case "enter":
+                m.popping = false
+                GetFilesFromServer()
+                return m, nil
+			}
+		}
+	}
+
+	if (!m.focus || !m.loaded) && !m.popping {
 		mlist, c := m.list.Update(msg)
 
-		m.list = mlist.(components.ListModel)
-        cmd = c
+		l := mlist.(components.ListModel)
+		m.list = &l
+		cmd = c
 	}
 
-	if (m.focus && !m.pickingConfig) || !m.loaded {
+	if ((m.focus && !m.pickingConfig) || !m.loaded) && !m.popping {
 		mrepl, c := m.repl.Update(msg)
 
-		m.repl = mrepl.(repl.ReplModel)
-
-        cmd = c
+		r := mrepl.(repl.ReplModel)
+		m.repl = &r
+		cmd = c
 	}
 
-	if (m.focus && m.pickingConfig) {
+	if (m.focus && m.pickingConfig) || !m.loaded {
 		mpicker, c := m.picker.Update(msg)
-		m.picker = mpicker
+		m.picker = &mpicker
 
-        cmd = c
+		cmd = c
+
+		selected, st := m.picker.DidSelectFile(msg)
+
+		if selected {
+			m.pickingConfig = false
+			m.repl.Redwood.LedConfig = st
+		}
 	}
 
 	m.loaded = true
@@ -130,15 +185,48 @@ func (m MenuModel) View() string {
 	} else {
 		list = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.list.View())
 		if m.pickingConfig {
-			repl = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.picker.View())
+			repl = m.unfocusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.picker.View())
 		} else {
-			repl = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.repl.View())
+			repl = m.unfocusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.repl.View())
 		}
 	}
 
-	return lipgloss.JoinHorizontal(
+	panes := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		repl,
 		list,
+	)
+
+    var yes lipgloss.Style
+    var no lipgloss.Style
+
+    if m.popupselected {
+        yes = m.popupyes
+        no = m.popupno
+    } else {
+        yes = m.popupno
+        no = m.popupyes
+    }
+
+	if m.popping {
+		return lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			lipgloss.JoinVertical(
+				lipgloss.Center,
+				m.popupStyle.Render(m.popup),
+				lipgloss.JoinHorizontal(
+					lipgloss.Center,
+					yes.Render("Yes"),
+					no.Render("No"),
+				),
+			),
+		)
+	}
+	return lipgloss.JoinVertical(
+		lipgloss.Center,
+		panes,
 	)
 }

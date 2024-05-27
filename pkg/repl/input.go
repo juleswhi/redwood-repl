@@ -37,8 +37,8 @@ func FailureStyles() *Styles {
 }
 
 type ReplModel struct {
-	configFile     string
-	redwood        Redwood
+	ConfigFile     string
+	Redwood        Redwood
 	successCommand bool
 	width          int
 	height         int
@@ -66,7 +66,7 @@ func NewReplModel(redwood *Redwood) *ReplModel {
 		answerField:    answerField,
 		successStyles:  success,
 		failureStyles:  failure,
-		redwood:        *redwood,
+		Redwood:        *redwood,
 		successCommand: true,
 	}
 }
@@ -86,26 +86,26 @@ func (m ReplModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		case "ctrl+l":
-			m.redwood.Clear(m.redwood.buf1)
+			m.Redwood.Clear(m.Redwood.Buf1)
 			m.cmds = nil
 			m.successCommand = true
 			return m, nil
 		case "ctrl+r":
 			return m, nil
 		case "enter":
-			m.redwood.Add(m.answerField.Value(), m.redwood.buf1)
-			m.redwood.Add("\n", m.redwood.buf1)
-			out, success := m.redwood.Run()
+			m.Redwood.Add(m.answerField.Value(), m.Redwood.Buf1)
+			m.Redwood.Add("\n", m.Redwood.Buf1)
+			out, success := m.Redwood.Run()
 			c := RedwoodCmd{input: m.answerField.Value(), output: out}
 			m.cmds = append(m.cmds, &c)
 			if success {
-				m.redwood.Clear(m.redwood.buf2)
-				contents := m.redwood.Read(m.redwood.buf1)
-				m.redwood.Add(contents, m.redwood.buf2)
+				m.Redwood.Clear(m.Redwood.Buf2)
+				contents := m.Redwood.Read(m.Redwood.Buf1)
+				m.Redwood.Add(contents, m.Redwood.Buf2)
 			} else {
-				m.redwood.Clear(m.redwood.buf1)
-				contents := m.redwood.Read(m.redwood.buf2)
-				m.redwood.Add(contents, m.redwood.buf1)
+				m.Redwood.Clear(m.Redwood.Buf1)
+				contents := m.Redwood.Read(m.Redwood.Buf2)
+				m.Redwood.Add(contents, m.Redwood.Buf1)
 			}
 			m.successCommand = success
 			m.answerField.SetValue("")
@@ -136,7 +136,7 @@ func (m ReplModel) View() string {
 	out := strings.Join(outputs, "")
 
 	if len(outputs) == 0 {
-		out = "Redwood Compiler "
+		out = "Redwood Compiler"
 	}
 
 	return lipgloss.JoinVertical(
@@ -170,7 +170,7 @@ func Init() *Redwood {
 			return nil
 		}
 
-		rw := Redwood{bin: bin_path, buf1: dir1, buf2: dir2}
+		rw := Redwood{Bin: bin_path, Buf1: dir1, Buf2: dir2}
 		return &rw
 	} else {
 		path := "/home/juleswhite/projects/redwood/zig-out/bin/redwood"
@@ -180,20 +180,20 @@ func Init() *Redwood {
 			return nil
 		}
 
-		rw := Redwood{bin: path, buf1: dir1, buf2: dir2}
+		rw := Redwood{Bin: path, Buf1: dir1, Buf2: dir2}
 		return &rw
 	}
 }
 
 type Redwood struct {
-	bin        string
-	buf1       string
-	buf2       string
-	led_config string
+	Bin        string
+	Buf1       string
+	Buf2       string
+	LedConfig string
 }
 
 func (r *Redwood) Run() (string, bool) {
-	cmd := exec.Command(r.bin, r.buf1, r.led_config)
+	cmd := exec.Command(r.Bin, r.Buf1, r.LedConfig)
 
 	out, err := cmd.CombinedOutput()
 
