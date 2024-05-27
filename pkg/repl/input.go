@@ -37,7 +37,6 @@ func FailureStyles() *Styles {
 }
 
 type ReplModel struct {
-	pickingConfig  bool
 	configFile     string
 	redwood        Redwood
 	successCommand bool
@@ -61,7 +60,7 @@ func NewReplModel(redwood *Redwood) *ReplModel {
 	success := SuccessStyles()
 	failure := FailureStyles()
 	answerField := textinput.New()
-	answerField.Placeholder = "Redwood Statement"
+	answerField.Placeholder = "Statement..."
 	answerField.Focus()
 	return &ReplModel{
 		answerField:    answerField,
@@ -73,7 +72,7 @@ func NewReplModel(redwood *Redwood) *ReplModel {
 }
 
 func (m ReplModel) Init() tea.Cmd {
-	return nil
+    return nil
 }
 
 func (m ReplModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -136,23 +135,20 @@ func (m ReplModel) View() string {
 
 	out := strings.Join(outputs, "")
 
-    if len(outputs) == 0 {
-        out = "Redwood REPL"
-        styles.Output = styles.Output.Bold(true)
-    }
+	if len(outputs) == 0 {
+		out = "Redwood Compiler "
+	}
 
-	return lipgloss.JoinVertical (
+	return lipgloss.JoinVertical(
 		lipgloss.Left,
 		styles.Output.Render(out),
-        styles.InputField.Width(m.width).Render(m.answerField.View()),
+		styles.InputField.Width(m.width).Render(m.answerField.View()),
 	)
 }
 
 func Init() *Redwood {
 	dir1 := "/tmp/e_buf_one.rw"
 	dir2 := "/tmp/e_buf_two.rw"
-
-	config := "led.json"
 
 	err := os.WriteFile(dir1, []byte{}, 0644)
 
@@ -174,7 +170,7 @@ func Init() *Redwood {
 			return nil
 		}
 
-		rw := Redwood{bin: bin_path, buf1: dir1, buf2: dir2, led_config: config}
+		rw := Redwood{bin: bin_path, buf1: dir1, buf2: dir2}
 		return &rw
 	} else {
 		path := "/home/juleswhite/projects/redwood/zig-out/bin/redwood"
@@ -184,7 +180,7 @@ func Init() *Redwood {
 			return nil
 		}
 
-		rw := Redwood{bin: path, buf1: dir1, buf2: dir2, led_config: config}
+		rw := Redwood{bin: path, buf1: dir1, buf2: dir2}
 		return &rw
 	}
 }
