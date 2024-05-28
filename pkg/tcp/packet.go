@@ -20,11 +20,13 @@ func NewFullPacket(meta PacketMeta, data *string, number *uint16) *FullPacket {
 	if number == nil {
 		r = rand.IntN(5000)
 	}
+
 	p := FullPacket{
 		Meta: &meta,
 		Data: nil,
 		Id:   uint16(r),
 	}
+
 	if data != nil {
 		p.Data = &PacketData{
 			Version: PROTOCOL_VERSION,
@@ -32,11 +34,14 @@ func NewFullPacket(meta PacketMeta, data *string, number *uint16) *FullPacket {
 			Data:    *data,
 		}
 	}
+
 	p.Meta.Id = p.Id
+
 	if p.Data != nil {
 		p.Data.Id = p.Id
         p.Meta.Len = uint16(len(p.Data.Data))
 	}
+
 	return &p
 }
 
@@ -80,6 +85,10 @@ func BadPacket() PacketMeta {
 
 func MakeMeta(bytes []byte) PacketMeta {
 	packet := NewMetaPacket()
+
+    if len(bytes) > 8 {
+        panic("Bytes received is too little")
+    }
 
 	packet.Version = bytes[0]
 	packet.Id = binary.LittleEndian.Uint16([]byte{bytes[1], bytes[2]})
@@ -172,16 +181,18 @@ func (packet FullPacket) SendRecv() *FullPacket {
 	if metaPacket.Len > 0 {
 		dataBuf := make([]byte, metaPacket.Len+3)
 		_, err = conn.Read(dataBuf)
+
 		if err != nil {
 			fmt.Println(err)
 			return nil
 		}
+
 		dataPacket := MakeData(dataBuf)
+
 		conn.Close()
 		return NewFullPacket(metaPacket, &dataPacket.Data, &metaPacket.Id)
 	}
 
 	return NewFullPacket(metaPacket, nil, nil)
-
 }
 

@@ -8,11 +8,14 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/jam-computing/oak/pkg/components"
 	"github.com/jam-computing/oak/pkg/repl"
+	"github.com/jam-computing/oak/pkg/tcp"
 )
 
 type MenuModel struct {
 	width  int
 	height int
+
+	connected bool
 
 	list   *components.ListModel
 	repl   *repl.ReplModel
@@ -33,10 +36,6 @@ type MenuModel struct {
 	unfocusStyle lipgloss.Style
 }
 
-func GetFilesFromServer() {
-
-}
-
 func CreateMenu() MenuModel {
 	focus, unfocus := CreateStyles()
 	r := repl.NewReplModel(repl.Init())
@@ -45,9 +44,9 @@ func CreateMenu() MenuModel {
 	fp.AllowedTypes = []string{".json"}
 	fp.CurrentDirectory, _ = os.Getwd()
 
-	pstyle := lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Bold(true)
-	focusColor := lipgloss.Color("36")
-	unfocusColor := lipgloss.Color("9")
+	pstyle := lipgloss.NewStyle().Bold(true)
+	focusColor := lipgloss.Color("12")
+	unfocusColor := lipgloss.Color("#3C3C3C")
 	pyes := lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Bold(true).Width(10).BorderForeground(focusColor).Align(lipgloss.Center)
 	pno := lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Bold(true).Width(10).BorderForeground(unfocusColor).Align(lipgloss.Center)
 
@@ -56,9 +55,10 @@ func CreateMenu() MenuModel {
 	}
 
 	return MenuModel{
+		connected:     false,
 		width:         0,
 		height:        0,
-		list:          components.NewListModel(),
+		list:          nil,
 		repl:          r,
 		picker:        &fp,
 		focusStyle:    focus,
@@ -71,13 +71,13 @@ func CreateMenu() MenuModel {
 		popupStyle:    pstyle,
 		popupyes:      pyes,
 		popupno:       pno,
-        popupselected: true,
+		popupselected: true,
 	}
 }
 
 func CreateStyles() (lipgloss.Style, lipgloss.Style) {
 	focusColor := lipgloss.Color("36")
-	unfocusColor := lipgloss.Color("9")
+	unfocusColor := lipgloss.Color("#3C3C3C")
 	focus := lipgloss.NewStyle().BorderForeground(focusColor).BorderStyle(lipgloss.RoundedBorder())
 	unfocus := lipgloss.NewStyle().BorderForeground(unfocusColor).BorderStyle(lipgloss.RoundedBorder())
 
@@ -85,9 +85,23 @@ func CreateStyles() (lipgloss.Style, lipgloss.Style) {
 }
 
 func (m MenuModel) Init() tea.Cmd {
-	m.list.Init()
 	m.repl.Init()
 	return m.picker.Init()
+}
+
+func (m *MenuModel) EstablishConnection() {
+	packet := tcp.NewFullPacket(tcp.NewMetaPacket(), nil, nil)
+	packet.Meta.Status = 200
+	packet.Meta.Command = 13
+	recv := packet.SendRecv()
+
+    if recv == nil {
+        panic("Could not receive packet")
+    }
+
+    m.connected = true
+	m.list = components.NewListModel()
+	_ = m.list.Init()
 }
 
 func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -98,33 +112,36 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyMsg:
 			switch msg.String() {
 			case "y":
-                m.popupselected = true
-                m.popping = false
-                GetFilesFromServer()
-                return m, nil
-            case "n":
-                m.popupselected = false
-                m.popping = false
-                GetFilesFromServer()
-                return m, nil
-            case "h":
-                m.popupselected = !m.popupselected
-            case "l":
-                m.popupselected = !m.popupselected
-            case "enter":
-                m.popping = false
-                GetFilesFromServer()
-                return m, nil
+				m.popupselected = true
+				m.popping = false
+				m.EstablishConnection()
+				return m, nil
+			case "n":
+				m.popupselected = false
+				m.popping = false
+				m.EstablishConnection()
+				return m, nil
+			case "h":
+				m.popupselected = !m.popupselected
+			case "l":
+				m.popupselected = !m.popupselected
+			case "enter":
+				m.popping = false
+				m.EstablishConnection()
+				return m, nil
 			}
 		}
 	}
 
-	if (!m.focus || !m.loaded) && !m.popping {
-		mlist, c := m.list.Update(msg)
+	if ((!m.focus || !m.loaded) && !m.popping) && m.connected {
+		if m.list != nil {
 
-		l := mlist.(components.ListModel)
-		m.list = &l
-		cmd = c
+			mlist, c := m.list.Update(msg)
+
+			l := mlist.(components.ListModel)
+			m.list = &l
+			cmd = c
+		}
 	}
 
 	if ((m.focus && !m.pickingConfig) || !m.loaded) && !m.popping {
@@ -155,7 +172,9 @@ func (m MenuModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.list.Update(msg)
+		if m.connected {
+			m.list.Update(msg)
+		}
 		m.repl.Update(msg)
 		m.picker.Update(msg)
 		return m, nil
@@ -176,14 +195,22 @@ func (m MenuModel) View() string {
 	var repl string
 
 	if m.focus {
-		list = m.unfocusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.list.View())
+		if m.connected {
+			list = m.unfocusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.list.View())
+		} else {
+			list = lipgloss.NewStyle().Align(lipgloss.Center).Italic(true).Render("Could not connect to server.")
+		}
 		if m.pickingConfig {
 			repl = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.picker.View())
 		} else {
 			repl = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.repl.View())
 		}
 	} else {
-		list = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.list.View())
+		if m.connected {
+			list = m.focusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.list.View())
+		} else {
+			list = lipgloss.NewStyle().Align(lipgloss.Center).Italic(true).Render("Could not connect to server.")
+		}
 		if m.pickingConfig {
 			repl = m.unfocusStyle.Height(m.height - 2).Width((m.width / 2) - 2).Render(m.picker.View())
 		} else {
@@ -197,16 +224,18 @@ func (m MenuModel) View() string {
 		list,
 	)
 
-    var yes lipgloss.Style
-    var no lipgloss.Style
+	var yes lipgloss.Style
+	var no lipgloss.Style
 
-    if m.popupselected {
-        yes = m.popupyes
-        no = m.popupno
-    } else {
-        yes = m.popupno
-        no = m.popupyes
-    }
+	if m.popupselected {
+		yes = m.popupyes
+		no = m.popupno
+	} else {
+		yes = m.popupno
+		no = m.popupyes
+	}
+
+	popupborder := lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#3C3C3C"))
 
 	if m.popping {
 		return lipgloss.Place(
@@ -214,17 +243,19 @@ func (m MenuModel) View() string {
 			m.height,
 			lipgloss.Center,
 			lipgloss.Center,
-			lipgloss.JoinVertical(
-				lipgloss.Center,
-				m.popupStyle.Render(m.popup),
-				lipgloss.JoinHorizontal(
+			popupborder.Render(
+				lipgloss.JoinVertical(
 					lipgloss.Center,
-					yes.Render("Yes"),
-					no.Render("No"),
-				),
-			),
+					m.popupStyle.Render(m.popup),
+					lipgloss.JoinHorizontal(
+						lipgloss.Center,
+						yes.Render("Yes"),
+						no.Render("No"),
+					),
+				)),
 		)
 	}
+
 	return lipgloss.JoinVertical(
 		lipgloss.Center,
 		panes,
